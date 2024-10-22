@@ -1,4 +1,4 @@
-# SQL Query Execution Web App
+# SQL Query Explorer Web App
 
 This web application allows users to write and execute SQL queries against a SQL Server database directly from the browser. The app provides a simple and intuitive interface where users can input SQL commands, view real-time query results, and manage their database interactions seamlessly.
 
