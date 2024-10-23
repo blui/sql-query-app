@@ -45,6 +45,31 @@ app.post("/execute-query", async (req, res) => {
   }
 });
 
+// API endpoint to save a query
+app.post("/save-query", async (req, res) => {
+  const { queryName, queryText } = req.body; // Extract query details from request body
+
+  try {
+    // Insert the saved query into the SavedQueries table
+    await sql.query(
+      `INSERT INTO SavedQueries (queryName, queryText) VALUES ('${queryName}', '${queryText}')`
+    );
+    res.json({ message: "Query saved successfully" });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// API endpoint to fetch saved queries
+app.get("/saved-queries", async (req, res) => {
+  try {
+    const result = await sql.query(`SELECT * FROM SavedQueries`);
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Start the server
 const PORT = 5000;
 app.listen(PORT, () => {

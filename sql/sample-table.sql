@@ -81,6 +81,15 @@ CREATE TABLE TravelAgents (
 );
 GO
 
+-- Create the SavedQueries table
+CREATE TABLE SavedQueries (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  queryName NVARCHAR(255) NOT NULL,
+  queryText NVARCHAR(MAX) NOT NULL,
+  createdAt DATETIME DEFAULT GETDATE()
+);
+GO
+
 -- Alters instructions go here
 
 -- Alter the Destinations table to add PopularityScore (e.g., based on bookings or reviews)
