@@ -23,7 +23,7 @@ const config = {
   },
 };
 
-// Connect to SQL Server
+// Establish SQL Server connection
 sql
   .connect(config)
   .then(() => {
@@ -35,13 +35,13 @@ sql
 
 // API endpoint for executing SQL queries
 app.post("/execute-query", async (req, res) => {
-  const { query } = req.body;
+  const { query } = req.body; // Extract query from request body
 
   try {
-    const result = await sql.query(query);
-    res.json(result.recordset);
+    const result = await sql.query(query); // Execute the SQL query
+    res.json(result.recordset); // Send the result back to the client
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: err.message }); // Send error response if query fails
   }
 });
 

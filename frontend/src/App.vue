@@ -24,12 +24,13 @@
       Execute Query
     </button>
 
-    <!-- Error Message -->
+    <!-- Error Message Display -->
     <div v-if="error" class="text-red-600 mt-4">
       <p>Error: {{ error }}</p>
+      <!-- Show error message if one exists -->
     </div>
 
-    <!-- Query Results -->
+    <!-- Query Results Table -->
     <div v-if="result && result.length" class="mt-6 w-full max-w-4xl">
       <h3 class="text-2xl font-semibold mb-4 text-gray-800">Results:</h3>
       <table
@@ -67,6 +68,7 @@
     <!-- No Results Message -->
     <div v-else-if="result" class="mt-4 text-gray-600">
       <p>No results to display.</p>
+      <!-- Fallback message if no results -->
     </div>
   </div>
 </template>
@@ -78,9 +80,9 @@ export default {
   name: "App",
   data() {
     return {
-      query: "", // Stores the SQL query input
-      result: null, // Stores the query results
-      error: null, // Stores any error messages
+      query: "", // SQL query input from user
+      result: null, // Result of the query
+      error: null, // Error message if query fails
     };
   },
   methods: {
@@ -89,7 +91,7 @@ export default {
         this.error = null;
         this.result = null;
 
-        // Send the SQL query to the backend
+        // Send SQL query to the backend
         const response = await axios.post(
           "http://localhost:5000/execute-query",
           {
@@ -97,10 +99,10 @@ export default {
           }
         );
 
-        // Set the result to display
+        // Store the result to display in the table
         this.result = response.data;
       } catch (err) {
-        // Handle errors
+        // If the query fails, store the error message
         if (err.response && err.response.data && err.response.data.error) {
           this.error = err.response.data.error;
         } else {
@@ -113,6 +115,7 @@ export default {
 </script>
 
 <style>
+/* General body font settings */
 body {
   font-family: "Segoe UI", Arial, sans-serif;
 }

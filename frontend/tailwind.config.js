@@ -1,7 +1,7 @@
 module.exports = {
   content: ["./public/**/*.html", "./src/**/*.{vue,js,ts,jsx,tsx}"],
   theme: {
-    extend: {},
+    extend: {}, // Customize Tailwind theme here if needed
   },
-  plugins: [],
+  plugins: [], // Add Tailwind plugins here if needed
 };
