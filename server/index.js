@@ -8,8 +8,15 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const winston = require("winston");
+const fs = require("fs");
+const path = require("path"); // Import the path module
 
-// Initialize the logger with winston
+// Load configuration from config.json
+const configPath = path.join(__dirname, "config.json");
+const configData = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const { sqlConfig, SECRET_KEY } = configData;
+
+// Initialize logger
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.combine(
@@ -22,88 +29,22 @@ const logger = winston.createLogger({
   ],
 });
 
-const app = express();
-const SECRET_KEY = "your-secret-key"; // Replace with a secure secret key
-
 // Middleware setup
-app.use(cors()); // Enable Cross-Origin Resource Sharing
-app.use(bodyParser.json()); // Parse incoming JSON requests
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
 
-// SQL Server connection configuration
-const config = {
-  user: "blui",
-  password: "test123!",
-  server: "localhost",
-  database: "VacationDestinations",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true,
-  },
-};
+let connectionConfig = sqlConfig;
 
 // Establish connection to SQL Server
-sql
-  .connect(config)
-  .then(() => {
-    logger.info("Connected to SQL Server");
-    console.log("Connected to SQL Server"); // Console log for debugging
-  })
-  .catch((err) => {
-    logger.error("Database connection failed:", err);
-    console.error("Database connection failed:", err); // Console log for error tracking
-  });
+function connectToDatabase() {
+  return sql
+    .connect(connectionConfig)
+    .then(() => logger.info("Connected to SQL Server"))
+    .catch((err) => logger.error("Database connection failed:", err));
+}
 
-// Register a new user
-app.post("/register", async (req, res) => {
-  const { username, password, email } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10); // Securely hash password
-
-  try {
-    await sql.query`INSERT INTO Users (username, password_hash, email) VALUES (${username}, ${hashedPassword}, ${email})`;
-    logger.info(`User registered successfully: ${username}`);
-    console.log("User registered successfully:", username); // For tracking success in console
-    res.status(201).json({ message: "User registered successfully" });
-  } catch (error) {
-    logger.error(`Registration failed for ${username}: ${error.message}`);
-    console.error("Registration failed:", error.message); // For error tracking
-    res.status(500).json({ error: "Registration failed" });
-  }
-});
-
-// Login route for users
-app.post("/login", async (req, res) => {
-  const { username, password } = req.body;
-
-  try {
-    const result =
-      await sql.query`SELECT * FROM Users WHERE username = ${username}`;
-    const user = result.recordset[0];
-
-    // Check if user exists and password is valid
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-      logger.warn(`Invalid login attempt for username: ${username}`);
-      console.warn("Invalid login attempt:", username); // Track invalid attempts
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    // Generate JWT token for session handling
-    const token = jwt.sign({ userId: user.id }, SECRET_KEY, {
-      expiresIn: "1h",
-    });
-    const sessionId = uuidv4();
-    const expiresAt = new Date(Date.now() + 3600000); // 1-hour expiry
-
-    await sql.query`INSERT INTO Sessions (session_id, user_id, expires_at) VALUES (${sessionId}, ${user.id}, ${expiresAt})`;
-
-    logger.info(`User logged in successfully: ${username}`);
-    console.log("User logged in:", username); // For tracking successful login
-    res.json({ token, sessionId });
-  } catch (error) {
-    logger.error(`Login failed for username: ${username} - ${error.message}`);
-    console.error("Login failed:", error.message); // Track login errors
-    res.status(500).json({ error: "Login failed" });
-  }
-});
+connectToDatabase();
 
 // Middleware to authenticate and verify user session
 const authenticate = async (req, res, next) => {
@@ -130,16 +71,88 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+// Endpoint to get SQL connection configuration
+app.get("/config", authenticate, (req, res) => {
+  try {
+    const configData = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    res.json(configData);
+  } catch (error) {
+    logger.error("Failed to load configuration:", error);
+    res.status(500).json({ error: "Failed to load configuration." });
+  }
+});
+
+// Endpoint to update SQL connection configuration
+app.put("/config", authenticate, async (req, res) => {
+  const newConfig = req.body;
+  configData.sqlConfig = newConfig;
+
+  // Save the new configuration to config.json
+  fs.writeFileSync(configPath, JSON.stringify(configData, null, 2));
+
+  // Update in-memory connection config
+  connectionConfig = newConfig;
+
+  // Reconnect with new config
+  await sql.close();
+  await connectToDatabase();
+
+  res.json({ message: "Configuration updated and reconnected" });
+});
+
+// Register a new user
+app.post("/register", async (req, res) => {
+  const { username, password, email } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  try {
+    await sql.query`INSERT INTO Users (username, password_hash, email) VALUES (${username}, ${hashedPassword}, ${email})`;
+    logger.info(`User registered successfully: ${username}`);
+    res.status(201).json({ message: "User registered successfully" });
+  } catch (error) {
+    logger.error(`Registration failed for ${username}: ${error.message}`);
+    res.status(500).json({ error: "Registration failed" });
+  }
+});
+
+// Login route for users
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const result =
+      await sql.query`SELECT * FROM Users WHERE username = ${username}`;
+    const user = result.recordset[0];
+
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      logger.warn(`Invalid login attempt for username: ${username}`);
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign({ userId: user.id }, SECRET_KEY, {
+      expiresIn: "1h",
+    });
+    const sessionId = uuidv4();
+    const expiresAt = new Date(Date.now() + 3600000);
+
+    await sql.query`INSERT INTO Sessions (session_id, user_id, expires_at) VALUES (${sessionId}, ${user.id}, ${expiresAt})`;
+
+    logger.info(`User logged in successfully: ${username}`);
+    res.json({ token, sessionId });
+  } catch (error) {
+    logger.error(`Login failed for username: ${username} - ${error.message}`);
+    res.status(500).json({ error: "Login failed" });
+  }
+});
+
 // Get user profile information
 app.get("/profile", authenticate, async (req, res) => {
-  console.log("Received request for /profile"); // Log to confirm endpoint hit
   try {
     const userId = req.userId;
-    if (!userId) {
-      throw new Error("User ID not found in session.");
-    }
+    if (!userId) throw new Error("User ID not found in session.");
+
     const result =
-      await sql.query`SELECT firstName, lastName, role, email FROM Users WHERE id = ${userId}`; // Updated to use 'role' field
+      await sql.query`SELECT firstName, lastName, role, email FROM Users WHERE id = ${userId}`;
     const profile = result.recordset[0];
 
     if (profile) {
@@ -153,7 +166,6 @@ app.get("/profile", authenticate, async (req, res) => {
     logger.error(
       `Failed to get profile for user ID: ${req.userId} - ${error.message}`
     );
-    console.error("Error in /profile endpoint:", error);
     res.status(500).json({ error: "Failed to get profile" });
   }
 });
@@ -162,9 +174,8 @@ app.get("/profile", authenticate, async (req, res) => {
 app.put("/profile", authenticate, async (req, res) => {
   try {
     const userId = req.userId;
-    const { firstName, lastName, role, email } = req.body; // Updated to use 'role' field
+    const { firstName, lastName, role, email } = req.body;
 
-    // Update profile in the Users table
     await sql.query`UPDATE Users SET firstName = ${firstName}, lastName = ${lastName}, role = ${role}, email = ${email} WHERE id = ${userId}`;
 
     logger.info(`Updated profile for user ID: ${userId}`);
@@ -185,13 +196,11 @@ app.post("/save-query", authenticate, async (req, res) => {
   try {
     await sql.query`INSERT INTO SavedQueries (queryName, queryText, user_id) VALUES (${queryName}, ${queryText}, ${userId})`;
     logger.info(`Query saved by user ID: ${userId}, Query Name: ${queryName}`);
-    console.log("Query saved:", queryName, "by user:", userId); // Track saved queries
     res.json({ message: "Query saved successfully" });
   } catch (err) {
     logger.error(
       `Failed to save query for user ID: ${userId} - ${err.message}`
     );
-    console.error("Failed to save query:", err.message); // Track save errors
     res.status(500).json({ error: "Could not save query" });
   }
 });
@@ -204,13 +213,11 @@ app.get("/saved-queries", authenticate, async (req, res) => {
     const result =
       await sql.query`SELECT * FROM SavedQueries WHERE user_id = ${userId}`;
     logger.info(`Fetched saved queries for user ID: ${userId}`);
-    console.log("Fetched saved queries for user:", userId); // Track fetch success
     res.json(result.recordset);
   } catch (error) {
     logger.error(
       `Failed to fetch queries for user ID: ${userId} - ${error.message}`
     );
-    console.error("Failed to fetch saved queries:", error.message); // Track fetch errors
     res.status(500).json({ error: "Could not fetch saved queries" });
   }
 });
@@ -222,11 +229,9 @@ app.post("/execute-query", async (req, res) => {
   try {
     const result = await sql.query(query);
     logger.info(`Executed query: ${query}`);
-    console.log("Executed query:", query); // Track execution of queries
     res.json(result.recordset);
   } catch (err) {
     logger.error(`Failed to execute query: ${query} - ${err.message}`);
-    console.error("Failed to execute query:", err.message); // Track execution errors
     res.status(400).json({ error: err.message });
   }
 });
@@ -235,5 +240,5 @@ app.post("/execute-query", async (req, res) => {
 const PORT = 5000;
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
-  console.log(`Server is running on http://localhost:${PORT}`); // Confirm server is running
+  console.log(`Server is running on http://localhost:${PORT}`);
 });

@@ -90,6 +90,33 @@ CREATE TABLE SavedQueries (
 );
 GO
 
+-- User Table: Stores user information with password hash for secure storage
+CREATE TABLE Users (
+    id INT PRIMARY KEY IDENTITY,
+    username NVARCHAR(50) UNIQUE NOT NULL,
+    password_hash NVARCHAR(255) NOT NULL,
+    email NVARCHAR(100) UNIQUE NOT NULL,
+    created_at DATETIME DEFAULT GETDATE()
+);
+GO
+
+-- Sessions Table: Tracks active sessions for users
+CREATE TABLE Sessions (
+    session_id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    user_id INT FOREIGN KEY REFERENCES Users(id) ON DELETE CASCADE,
+    created_at DATETIME DEFAULT GETDATE(),
+    expires_at DATETIME
+);
+GO
+
+-- Optional: User Preferences Table to save individual user settings
+CREATE TABLE UserPreferences (
+    user_id INT FOREIGN KEY REFERENCES Users(id) ON DELETE CASCADE,
+    theme NVARCHAR(50),
+    default_query NVARCHAR(MAX)
+);
+GO
+
 -- Alters instructions go here
 
 -- Alter the Destinations table to add PopularityScore (e.g., based on bookings or reviews)
@@ -102,3 +129,13 @@ ALTER TABLE VacationPackages
 ADD TravelAgentID INT,
 FOREIGN KEY (TravelAgentID) REFERENCES TravelAgents(AgentID);
 GO
+
+-- Alter SavedQueries to ensure user_id field is used to associate queries with specific users
+ALTER TABLE SavedQueries
+ADD user_id INT FOREIGN KEY REFERENCES Users(id) ON DELETE CASCADE;
+
+-- Alter Users to add firstname, lastname, and role columns
+ALTER TABLE Users
+ADD firstName NVARCHAR(50),
+    lastName NVARCHAR(50),
+    role NVARCHAR(50);

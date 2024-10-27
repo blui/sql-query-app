@@ -11,10 +11,15 @@
   "description": "",
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.6.0",
+    "bcrypt": "^5.1.1",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "express": "^4.21.1",
+    "fs": "^0.0.1-security",
+    "jsonwebtoken": "^9.0.2",
     "msnodesqlv8": "^4.2.1",
-    "mssql": "^11.0.1"
+    "mssql": "^11.0.1",
+    "uuid": "^10.0.0",
+    "winston": "^3.15.0"
   }
 }

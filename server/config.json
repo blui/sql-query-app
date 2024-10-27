@@ -1,0 +1,13 @@
+{
+  "sqlConfig": {
+    "user": "blui",
+    "password": "test123!",
+    "server": "localhost",
+    "database": "VacationDestinations",
+    "options": {
+      "encrypt": false,
+      "trustServerCertificate": true
+    }
+  },
+  "SECRET_KEY": "your-secret-key"
+}
