@@ -1,6 +1,6 @@
 <template>
   <div id="app" class="h-screen flex overflow-hidden bg-secondary-light">
-    <!-- Show LoginForm or RegisterForm if not logged in -->
+    <!-- Login or Register Form -->
     <div v-if="!loggedIn" class="flex items-center justify-center w-full">
       <LoginForm
         v-if="!showRegister"
@@ -14,9 +14,9 @@
       />
     </div>
 
-    <!-- Main Content Area (only shows if logged in) -->
+    <!-- Main Content Area -->
     <div v-else class="flex flex-grow overflow-hidden bg-gray-100">
-      <!-- Sidebar with navigation and saved queries -->
+      <!-- Sidebar for Navigation and Saved Queries -->
       <aside
         class="w-1/5 bg-primary-dark text-white flex-shrink-0 flex flex-col"
       >
@@ -25,11 +25,9 @@
         >
           SQL Explorer
         </div>
-
         <nav class="flex-grow mt-6 px-4">
           <ul class="space-y-4">
             <li>
-              <!-- Navigate back to Query Editor -->
               <a
                 href="#"
                 @click.prevent="showProfile = false"
@@ -47,8 +45,7 @@
               </a>
             </li>
           </ul>
-
-          <!-- Saved Queries Section -->
+          <!-- Saved Queries -->
           <div class="mt-8">
             <h3 class="text-lg font-semibold px-4">Saved Queries</h3>
             <ul class="space-y-2 mt-4 px-4">
@@ -77,74 +74,57 @@
 
       <!-- Main Query and Result Area -->
       <div class="flex-1 flex flex-col overflow-hidden">
-        <!-- Updated Header with Search Bar, Profile Icon, and Dropdown Menu -->
+        <!-- Header with Search Bar and Profile -->
         <header
           class="w-full h-16 bg-white shadow flex items-center justify-between px-6 relative"
         >
-          <!-- Welcome message with username -->
           <h1 class="text-lg font-semibold text-gray-700">
-            Welcome, {{ username }}
+            Welcome, {{ username || "User" }}
           </h1>
-
-          <!-- Search Bar (standard size) and Profile Icon -->
-          <div class="flex items-center space-x-4">
-            <!-- Standard-sized search bar -->
-            <input
-              type="text"
-              placeholder="Search..."
-              class="w-64 p-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-light"
-            />
-
-            <!-- Profile Icon with Dropdown Menu -->
-            <div class="relative">
-              <button @click="toggleProfileMenu" class="relative">
-                <!-- Conditional rendering for username character -->
-                <span
-                  v-if="username"
-                  class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-semibold"
-                >
-                  {{ username.charAt(0).toUpperCase() }}
-                </span>
-              </button>
-
-              <!-- Dropdown Menu for Profile -->
-              <div
-                v-if="profileMenuVisible"
-                class="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10"
+          <div class="relative" v-if="username">
+            <button @click="toggleProfileMenu" class="relative">
+              <span
+                v-if="username"
+                class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-semibold"
               >
-                <ul>
-                  <li>
-                    <button
-                      @click="viewProfile"
-                      class="w-full text-left px-4 py-2 hover:bg-gray-100"
-                    >
-                      Profile
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      @click="logout"
-                      class="w-full text-left px-4 py-2 hover:bg-gray-100"
-                    >
-                      Log Out
-                    </button>
-                  </li>
-                </ul>
-              </div>
+                {{ username.charAt(0).toUpperCase() }}
+              </span>
+            </button>
+            <div
+              v-if="profileMenuVisible"
+              class="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10"
+            >
+              <ul>
+                <li>
+                  <button
+                    @click="viewProfile"
+                    class="w-full text-left px-4 py-2 hover:bg-gray-100"
+                  >
+                    Profile
+                  </button>
+                </li>
+                <li>
+                  <button
+                    @click="logout"
+                    class="w-full text-left px-4 py-2 hover:bg-gray-100"
+                  >
+                    Log Out
+                  </button>
+                </li>
+              </ul>
             </div>
           </div>
         </header>
 
-        <!-- Main Content or Profile View -->
+        <!-- Main Content (Profile or Query View) -->
         <main class="flex-1 overflow-y-auto p-8">
           <div v-if="showProfile">
             <UserProfile @back="showProfile = false" />
           </div>
           <div v-else>
-            <!-- SQL Connection Configuration Section -->
-            <SqlConnectionConfig />
-
-            <!-- Query Editor Section -->
+            <!-- SQL Connection Configuration -->
+            <SqlConnectionConfig @setDbConfig="setDbConfig" />
+            <!-- Query Editor -->
             <section class="mb-8 bg-white p-6 rounded-lg shadow-md">
               <h2 class="text-2xl font-semibold mb-4">Query Editor</h2>
               <textarea
@@ -152,8 +132,6 @@
                 placeholder="Enter SQL query here..."
                 class="w-full h-80 p-4 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               ></textarea>
-
-              <!-- Save and Execute Buttons -->
               <div class="flex items-center mt-4">
                 <input
                   v-model="queryName"
@@ -176,8 +154,7 @@
                 </button>
               </div>
             </section>
-
-            <!-- Query Results Table -->
+            <!-- Query Results -->
             <section
               v-if="result && result.length"
               class="mb-8 bg-white p-6 rounded-lg shadow-md"
@@ -245,14 +222,26 @@ export default {
       savedQueries: [],
       profileMenuVisible: false,
       showProfile: false,
-      username: null,
+      username: "",
+      dbConfig: null,
     };
   },
-
-  mounted() {
+  async mounted() {
+    axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          this.logout();
+          this.error = "Your session has expired. Please log in again.";
+          return Promise.reject(error);
+        }
+        return Promise.reject(error);
+      }
+    );
     if (this.loggedIn) {
-      this.fetchUserData();
-      this.fetchSavedQueries();
+      await this.fetchUserData();
+      await this.fetchSavedQueries();
+      await this.fetchInitialDbConfig();
     }
   },
   methods: {
@@ -262,18 +251,40 @@ export default {
         "X-Session-Id": localStorage.getItem("sessionId"),
       };
     },
-    handleLoginSuccess(username) {
+    async fetchInitialDbConfig() {
+      try {
+        const response = await axios.get("http://localhost:5000/config", {
+          headers: this.getAuthHeaders(),
+        });
+        this.dbConfig = response.data.sqlConfig.VacationDestinations;
+        log.info("Fetched initial dbConfig:", this.dbConfig);
+      } catch (error) {
+        this.error = "Failed to load database configuration.";
+        console.error("Error loading initial dbConfig:", error);
+      }
+    },
+    setDbConfig(config) {
+      this.dbConfig = config;
+      log.info("Updated dbConfig:", this.dbConfig);
+    },
+    handleLoginSuccess(data) {
       this.loggedIn = true;
-      this.username = username;
-      log.info("User logged in successfully");
+      this.username = data.username || "";
+      log.info("User logged in successfully with username:", this.username);
       this.fetchSavedQueries();
+      this.fetchInitialDbConfig();
+    },
+    toggleProfileMenu() {
+      this.profileMenuVisible = !this.profileMenuVisible;
     },
     async fetchUserData() {
       try {
         const response = await axios.get("http://localhost:5000/profile", {
           headers: this.getAuthHeaders(),
         });
-        this.username = response.data.firstName || "User";
+        this.username =
+          response.data.firstName || response.data.username || "User";
+        console.log("Fetched user data:", this.username);
       } catch (error) {
         console.error("Error fetching user data:", error);
       }
@@ -284,20 +295,21 @@ export default {
     showLoginForm() {
       this.showRegister = false;
     },
-    toggleProfileMenu() {
-      this.profileMenuVisible = !this.profileMenuVisible;
-    },
     viewProfile() {
       this.showProfile = true;
       this.profileMenuVisible = false;
     },
     async executeQuery() {
+      if (!this.dbConfig) {
+        this.error = "Database configuration is not set.";
+        return;
+      }
       try {
         this.error = null;
         this.result = null;
         const response = await axios.post(
           "http://localhost:5000/execute-query",
-          { query: this.query },
+          { query: this.query, dbConfig: this.dbConfig },
           { headers: this.getAuthHeaders() }
         );
         this.result = response.data;
@@ -349,6 +361,9 @@ export default {
       this.result = null;
       this.savedQueries = [];
       this.profileMenuVisible = false;
+      this.showProfile = false;
+      this.username = "";
+      this.dbConfig = null;
     },
   },
 };

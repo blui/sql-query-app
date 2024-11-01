@@ -2,7 +2,9 @@
   <div class="p-8 bg-white rounded-lg shadow-md max-w-md mx-auto">
     <h2 class="text-2xl font-semibold mb-4">Your Profile</h2>
 
+    <!-- Profile Update Form -->
     <form @submit.prevent="updateProfile">
+      <!-- First Name Input -->
       <div class="mb-4">
         <label class="block text-gray-700 text-sm font-bold mb-2"
           >First Name</label
@@ -14,6 +16,7 @@
         />
       </div>
 
+      <!-- Last Name Input -->
       <div class="mb-4">
         <label class="block text-gray-700 text-sm font-bold mb-2"
           >Last Name</label
@@ -25,6 +28,7 @@
         />
       </div>
 
+      <!-- Role Input -->
       <div class="mb-4">
         <label class="block text-gray-700 text-sm font-bold mb-2">Role</label>
         <input
@@ -34,6 +38,7 @@
         />
       </div>
 
+      <!-- Email Input -->
       <div class="mb-4">
         <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
         <input
@@ -44,6 +49,7 @@
         />
       </div>
 
+      <!-- Update Button -->
       <button
         type="submit"
         class="bg-primary text-white py-2 px-4 rounded-lg mt-4 hover:bg-primary-dark transition"
@@ -52,6 +58,7 @@
       </button>
     </form>
 
+    <!-- Success and Error Messages -->
     <p v-if="successMessage" class="text-green-500 mt-4">
       {{ successMessage }}
     </p>
@@ -69,26 +76,31 @@ export default {
       profile: {
         firstName: "",
         lastName: "",
-        role: "", // Updated field to match 'role' instead of 'job'
+        role: "",
         email: "",
       },
-      error: null,
-      successMessage: null,
+      error: null, // Error message storage
+      successMessage: null, // Success message storage
     };
   },
   mounted() {
-    this.fetchProfile();
+    this.fetchProfile(); // Fetch profile data when component is mounted
   },
   methods: {
+    /**
+     * Fetch the user's profile information from the server.
+     */
     async fetchProfile() {
       try {
         const response = await axios.get("http://localhost:5000/profile", {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "x-session-id": localStorage.getItem("sessionId"), // Ensure session ID is sent
+            "X-Session-Id": localStorage.getItem("sessionId"),
           },
         });
+
         if (response.data) {
+          // Populate profile fields with response data, fallback to empty if not available
           this.profile = {
             firstName: response.data.firstName || "",
             lastName: response.data.lastName || "",
@@ -101,17 +113,23 @@ export default {
         console.error("Error fetching profile:", error);
       }
     },
+
+    /**
+     * Update the user's profile with the current form data.
+     */
     async updateProfile() {
       try {
         await axios.put("http://localhost:5000/profile", this.profile, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "X-Session-Id": localStorage.getItem("sessionId"), // Add session ID here for update
+            "X-Session-Id": localStorage.getItem("sessionId"),
           },
         });
         this.successMessage = "Profile updated successfully";
+        this.error = null;
       } catch (error) {
         this.error = "Failed to update profile";
+        this.successMessage = null;
         console.error("Error updating profile:", error);
       }
     },

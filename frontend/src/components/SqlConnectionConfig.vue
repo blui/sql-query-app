@@ -11,9 +11,9 @@
       </button>
     </div>
 
-    <!-- Conditionally render the form based on `collapsed` state -->
     <div v-if="!collapsed">
       <form @submit.prevent="saveConnectionConfig">
+        <!-- Form for SQL Connection Inputs -->
         <div class="grid grid-cols-2 gap-4">
           <div v-for="(value, key) in filteredConfig" :key="key">
             <label
@@ -31,12 +31,11 @@
             />
           </div>
 
-          <!-- Options Section -->
+          <!-- Options Section for Encrypt and Trust Server Certificate -->
           <div class="col-span-2 mt-4">
             <h3 class="text-lg font-semibold text-gray-700">Options</h3>
           </div>
 
-          <!-- Encrypt Option -->
           <div>
             <label
               for="encrypt"
@@ -52,7 +51,6 @@
             </select>
           </div>
 
-          <!-- Trust Server Certificate Option -->
           <div>
             <label
               for="trustServerCertificate"
@@ -69,12 +67,33 @@
           </div>
         </div>
 
-        <button
-          type="submit"
-          class="bg-primary text-white py-2 px-4 rounded-lg mt-4 hover:bg-primary-dark transition"
+        <!-- Test and Save Buttons -->
+        <div class="mt-4 flex space-x-4">
+          <button
+            type="button"
+            @click="testConnection"
+            class="bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition"
+          >
+            Test Connection
+          </button>
+          <button
+            type="submit"
+            class="bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition"
+          >
+            Save Configuration
+          </button>
+        </div>
+
+        <!-- Connection Test Message -->
+        <p
+          v-if="testMessage"
+          :class="{
+            'text-green-500': testSuccess,
+            'text-red-500': !testSuccess,
+          }"
         >
-          Save Configuration
-        </button>
+          {{ testMessage }}
+        </p>
       </form>
     </div>
   </section>
@@ -87,7 +106,7 @@ export default {
   name: "SqlConnectionConfig",
   data() {
     return {
-      collapsed: true, // Controls whether the section is collapsed
+      collapsed: true, // Controls visibility of the form
       connectionConfig: {
         user: "",
         password: "",
@@ -98,10 +117,16 @@ export default {
           trustServerCertificate: false,
         },
       },
-      error: null,
+      error: null, // Stores any error message for display
+      testMessage: "", // Holds the message for connection test status
+      testSuccess: false, // Flag to show if connection test passed or failed
     };
   },
   computed: {
+    /**
+     * Filters out the 'options' object from the main configuration
+     * so it can be displayed separately in the form.
+     */
     filteredConfig() {
       return Object.fromEntries(
         Object.entries(this.connectionConfig).filter(
@@ -118,21 +143,54 @@ export default {
           "X-Session-Id": localStorage.getItem("sessionId"),
         },
       });
-      this.connectionConfig = response.data.sqlConfig;
+      // Load default VacationDestinations configuration
+      this.connectionConfig = response.data.sqlConfig.VacationDestinations;
     } catch (error) {
       this.error = "Failed to load configuration. Please try again.";
       console.error("Error loading configuration:", error);
     }
   },
   methods: {
+    /**
+     * Tests the current database connection settings to verify configuration.
+     */
+    async testConnection() {
+      try {
+        const response = await axios.post(
+          "http://localhost:5000/test-connection",
+          this.connectionConfig,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "X-Session-Id": localStorage.getItem("sessionId"),
+            },
+          }
+        );
+        this.testMessage = response.data.message;
+        this.testSuccess = true;
+      } catch (error) {
+        this.testMessage =
+          "Connection test failed. Please verify your settings.";
+        this.testSuccess = false;
+        console.error("Error testing connection:", error);
+      }
+    },
+    /**
+     * Saves the current configuration specifically for VacationDestinations.
+     * This ensures that the private SQLQueryExplorer configuration is not overwritten.
+     */
     async saveConnectionConfig() {
       try {
-        await axios.put("http://localhost:5000/config", this.connectionConfig, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "X-Session-Id": localStorage.getItem("sessionId"),
-          },
-        });
+        await axios.put(
+          "http://localhost:5000/config",
+          { sqlConfig: { VacationDestinations: this.connectionConfig } },
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "X-Session-Id": localStorage.getItem("sessionId"),
+            },
+          }
+        );
         alert("Configuration updated successfully!");
       } catch (error) {
         this.error = "Failed to save configuration. Please try again.";
@@ -142,3 +200,7 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* Scoped styling for the SQL Connection Configuration component */
+</style>

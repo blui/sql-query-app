@@ -18,6 +18,7 @@
           required
         />
       </div>
+
       <!-- Email Input -->
       <div class="mb-4">
         <label for="email" class="block text-gray-700 text-sm font-bold mb-2">
@@ -31,6 +32,7 @@
           required
         />
       </div>
+
       <!-- Password Input -->
       <div class="mb-6">
         <label
@@ -47,11 +49,33 @@
           required
         />
       </div>
+
+      <!-- Schema Selection -->
+      <div class="mb-6">
+        <label
+          for="database"
+          class="block text-gray-700 text-sm font-bold mb-2"
+        >
+          Select Database
+        </label>
+        <select
+          v-model="database"
+          id="database"
+          class="w-full p-2 border rounded"
+        >
+          <option value="SQLQueryExplorer">SQL Query Explorer</option>
+          <option value="VacationDestinations">Vacation Destinations</option>
+        </select>
+      </div>
+
       <!-- Register Button -->
       <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">
         Register
       </button>
+
+      <!-- Error Message Display -->
       <p v-if="error" class="text-red-500 text-sm mt-4">{{ error }}</p>
+
       <!-- Switch to Login Link -->
       <p class="mt-4 text-center">
         Already have an account?
@@ -67,23 +91,28 @@
 import axios from "axios";
 import log from "loglevel";
 
-log.setLevel("info"); // Set log level (adjustable based on environment)
+log.setLevel("info");
 
 export default {
   name: "RegisterForm",
   data() {
     return {
-      username: "",
-      email: "",
-      password: "",
-      error: null,
+      username: "", // User's chosen username
+      email: "", // User's email
+      password: "", // User's chosen password
+      database: "SQLQueryExplorer", // Default database/schema selection
+      error: null, // Holds any error message
     };
   },
   methods: {
+    /**
+     * Handles registration functionality.
+     * Sends user data to backend, including username, email, and password.
+     */
     async register() {
       log.info("Registration attempt started for user:", this.username);
       try {
-        this.error = null; // Reset previous error
+        this.error = null;
 
         await axios.post("http://localhost:5000/register", {
           username: this.username,
@@ -91,8 +120,12 @@ export default {
           password: this.password,
         });
 
+        // Store selected database to ensure consistency in user experience
+        localStorage.setItem("database", this.database);
         log.info("Registration successful for user:", this.username);
-        this.$emit("registerSuccess"); // Notify parent of successful registration
+
+        // Emit registration success event to switch to login view
+        this.$emit("registerSuccess");
       } catch (err) {
         this.error = err.response?.data?.error || "Registration failed";
         log.error(
@@ -103,9 +136,13 @@ export default {
         );
       }
     },
+
+    /**
+     * Switches back to the login form.
+     */
     switchToLogin() {
       log.debug("Switching to login form from registration");
-      this.$emit("switchToLogin"); // Notify parent to show LoginForm
+      this.$emit("switchToLogin");
     },
   },
 };
